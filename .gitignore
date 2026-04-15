@@ -40,3 +40,5 @@ php-cs-fixer
 /.php_cs
 /.idea
 custom_*.*
+artist-landing-page/.next
+artist-landing-page/node_modules
