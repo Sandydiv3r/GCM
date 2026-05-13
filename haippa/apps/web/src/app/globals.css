@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background:     250 246 240;
+    --foreground:     28 26 23;
+    --card:           255 255 255;
+    --card-foreground: 28 26 23;
+    --primary:        193 95 60;
+    --primary-foreground: 253 250 246;
+    --secondary:      212 147 63;
+    --secondary-foreground: 28 26 23;
+    --muted:          240 232 218;
+    --muted-foreground: 107 98 88;
+    --border:         232 221 208;
+    --input:          232 221 208;
+    --ring:           193 95 60;
+    --radius: 0.5rem;
+    --font-playfair: 'Playfair Display', Georgia, serif;
+    --font-inter:    'Inter', system-ui, sans-serif;
+  }
+  * { @apply border-border; }
+  body { @apply bg-sand-100 text-charcoal font-sans antialiased; }
+  h1, h2, h3, h4 { @apply font-display; }
+}
+
+@layer components {
+  .artwork-card { @apply transition-all duration-300 hover:shadow-card-hover hover:-translate-y-0.5; }
+  .section-warm { @apply bg-gradient-to-b from-sand-100 to-sand-200; }
+  .hero-overlay { @apply bg-gradient-to-t from-charcoal-900/70 via-charcoal-900/20 to-transparent; }
+  .badge-verified { @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700; }
+  .price-tag { @apply font-display font-semibold text-charcoal-900; }
+}
