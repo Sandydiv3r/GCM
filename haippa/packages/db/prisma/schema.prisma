@@ -1,0 +1,436 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  BUYER
+  ARTIST
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SubscriptionTier {
+  FREE
+  STANDARD
+  PREMIUM
+}
+
+enum ArtworkCondition {
+  NEW
+  EXCELLENT
+  GOOD
+  FAIR
+}
+
+enum OriginalityType {
+  ORIGINAL
+  LIMITED_PRINT
+  OPEN_PRINT
+}
+
+enum ArtworkStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  SOLD
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAYMENT_CONFIRMED
+  AWAITING_SHIPMENT
+  SHIPPED
+  DELIVERED
+  COMPLETED
+  DISPUTED
+  REFUNDED
+  CANCELLED
+}
+
+enum PayoutStatus {
+  HELD
+  RELEASED
+  REFUNDED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+enum CommissionStatus {
+  SUBMITTED
+  MATCHED
+  DEPOSIT_PAID
+  IN_PROGRESS
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+// ─── Users & Auth ─────────────────────────────────────────────────────────────
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String?
+  role         UserRole   @default(BUYER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  profile       Profile?
+  artistProfile ArtistProfile?
+  orders        Order[]
+  sessions      Session[]
+  commissions   CommissionRequest[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Profile {
+  id        String  @id @default(cuid())
+  userId    String  @unique
+  firstName String
+  lastName  String
+  phone     String?
+  avatarUrl String?
+  country   String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+// ─── Artist Onboarding ────────────────────────────────────────────────────────
+
+model ArtistApplication {
+  id              String            @id @default(cuid())
+  userId          String?
+  email           String
+  fullName        String
+  country         String
+  city            String?
+  bio             String
+  portfolioUrls   String[]
+  instagramHandle String?
+  idDocumentUrl   String?
+  status          ApplicationStatus @default(PENDING)
+  reviewNotes     String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime          @default(now())
+
+  @@map("artist_applications")
+}
+
+model ArtistProfile {
+  id               String           @id @default(cuid())
+  userId           String           @unique
+  displayName      String
+  slug             String           @unique
+  bio              String
+  story            String?
+  country          String
+  city             String?
+  profileImageUrl  String?
+  bannerImageUrl   String?
+  instagramHandle  String?
+  websiteUrl       String?
+  isVerified       Boolean          @default(false)
+  isFeatured       Boolean          @default(false)
+  subscriptionTier SubscriptionTier @default(FREE)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payoutDetail PayoutDetail?
+  artworks     Artwork[]
+
+  @@map("artist_profiles")
+}
+
+model PayoutDetail {
+  id              String  @id @default(cuid())
+  artistProfileId String  @unique
+  provider        String
+  accountDetails  Json
+  isVerified      Boolean @default(false)
+
+  artistProfile ArtistProfile @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
+
+  @@map("payout_details")
+}
+
+// ─── Artworks ─────────────────────────────────────────────────────────────────
+
+model Artwork {
+  id                String           @id @default(cuid())
+  artistProfileId   String
+  title             String
+  description       String
+  story             String?
+  medium            String
+  style             String?
+  subject           String?
+  year              Int?
+  widthCm           Float?
+  heightCm          Float?
+  depthCm           Float?
+  weightKg          Float?
+  isFramed          Boolean          @default(false)
+  condition         ArtworkCondition @default(NEW)
+  originality       OriginalityType
+  editionSize       Int?
+  editionNumber     Int?
+  price             Int
+  currency          String           @default("GBP")
+  status            ArtworkStatus    @default(DRAFT)
+  isFeatured        Boolean          @default(false)
+  originDeclaration Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  artistProfile   ArtistProfile      @relation(fields: [artistProfileId], references: [id], onDelete: Cascade)
+  images          ArtworkImage[]
+  tags            ArtworkTag[]
+  collections     CollectionArtwork[]
+  orderItems      OrderItem[]
+  analyticsEvents AnalyticsEvent[]
+
+  @@map("artworks")
+}
+
+model ArtworkImage {
+  id        String  @id @default(cuid())
+  artworkId String
+  url       String
+  altText   String?
+  isPrimary Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  artwork Artwork @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  @@map("artwork_images")
+}
+
+model ArtworkTag {
+  id        String @id @default(cuid())
+  artworkId String
+  tag       String
+
+  artwork Artwork @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  @@unique([artworkId, tag])
+  @@map("artwork_tags")
+}
+
+// ─── Collections ──────────────────────────────────────────────────────────────
+
+model Collection {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  bannerUrl   String?
+  isFeatured  Boolean  @default(false)
+  isPublished Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  artworks CollectionArtwork[]
+
+  @@map("collections")
+}
+
+model CollectionArtwork {
+  collectionId String
+  artworkId    String
+  sortOrder    Int    @default(0)
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  artwork    Artwork    @relation(fields: [artworkId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, artworkId])
+  @@map("collection_artworks")
+}
+
+// ─── Orders ───────────────────────────────────────────────────────────────────
+
+model Order {
+  id                String      @id @default(cuid())
+  buyerId           String
+  status            OrderStatus @default(PENDING_PAYMENT)
+  subtotalAmount    Int
+  platformFeeAmount Int
+  shippingAmount    Int         @default(0)
+  totalAmount       Int
+  currency          String      @default("GBP")
+  shippingAddress   Json
+  paymentRef        String?
+  paymentProvider   String?
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  buyer    User            @relation(fields: [buyerId], references: [id])
+  items    OrderItem[]
+  timeline OrderTimeline[]
+  dispute  Dispute?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String       @id @default(cuid())
+  orderId         String
+  artworkId       String
+  artistProfileId String
+  quantity        Int          @default(1)
+  unitPrice       Int
+  platformFee     Int
+  payoutAmount    Int
+  payoutStatus    PayoutStatus @default(HELD)
+  payoutRef       String?
+  trackingNumber  String?
+  trackingUrl     String?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  artwork Artwork @relation(fields: [artworkId], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderTimeline {
+  id        String   @id @default(cuid())
+  orderId   String
+  event     String
+  note      String?
+  actorId   String?
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_timeline")
+}
+
+// ─── Disputes ─────────────────────────────────────────────────────────────────
+
+model Dispute {
+  id          String        @id @default(cuid())
+  orderId     String        @unique
+  raisedBy    String
+  reason      String
+  description String
+  status      DisputeStatus @default(OPEN)
+  resolution  String?
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  createdAt   DateTime      @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@map("disputes")
+}
+
+// ─── Commissions ──────────────────────────────────────────────────────────────
+
+model CommissionRequest {
+  id              String           @id @default(cuid())
+  buyerId         String
+  artistProfileId String?
+  title           String
+  description     String
+  budgetMin       Int?
+  budgetMax       Int?
+  currency        String           @default("GBP")
+  deadline        DateTime?
+  referenceUrls   String[]
+  status          CommissionStatus @default(SUBMITTED)
+  depositAmount   Int?
+  platformFee     Int?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  buyer User @relation(fields: [buyerId], references: [id])
+
+  @@map("commission_requests")
+}
+
+// ─── Monetisation ─────────────────────────────────────────────────────────────
+
+model FeaturedPlacement {
+  id              String   @id @default(cuid())
+  artistProfileId String?
+  artworkId       String?
+  slot            String
+  startsAt        DateTime
+  endsAt          DateTime
+  priceGBP        Int
+  isPaid          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@map("featured_placements")
+}
+
+model SubscriptionPlan {
+  id       String           @id @default(cuid())
+  tier     SubscriptionTier @unique
+  name     String
+  priceGBP Int
+  features Json
+
+  @@map("subscription_plans")
+}
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  event      String
+  entityType String?
+  entityId   String?
+  userId     String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  artwork Artwork? @relation(fields: [entityId], references: [id])
+
+  @@map("analytics_events")
+}
